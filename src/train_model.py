@@ -1,194 +1,168 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
+"""
+Phase 2 -- Model Training (XGBoost)
+=====================================
+- Raw features (no PCA) for SHAP interpretability
+- LabelEncoder fitted on train, applied to test
+- GridSearchCV hyperparameter tuning (n_estimators, max_depth, learning_rate)
+- Full classification report (precision / recall / F1)
+- Saves: loan_model.pkl, explainer.pkl, feature_names.pkl, label_encoders.pkl
+"""
+
+import os
+import sys
 import joblib
+import numpy as np
+import pandas as pd
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.model_selection import GridSearchCV, StratifiedKFold
+from xgboost import XGBClassifier
 import shap
-import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="Loan Eligibility Predictor", layout="wide")
+# Allow running from repo root: python src/train_model.py
+sys.path.insert(0, os.path.dirname(__file__))
+from data_processing import get_processed_data, split_data
 
-st.title("🏦 Loan Eligibility Predictor")
-st.markdown("Enter customer details to predict loan eligibility and understand the reasoning behind the decision.")
-
-# Load model and artifacts
-@st.cache_resource
-def load_artifacts():
-    try:
-        model = joblib.load('models/loan_model.pkl')
-        explainer = joblib.load('models/explainer.pkl')
-        feature_names = joblib.load('models/feature_names.pkl')
-        return model, explainer, feature_names
-    except FileNotFoundError:
-        return None, None, None
-
-model, explainer, feature_names = load_artifacts()
-
-if model is None:
-    st.error("Model files not found. Please run `src/train_model.py` first.")
-    st.stop()
-
-# Sidebar for inputs
-st.sidebar.header("Customer Information")
-
-def user_input_features():
-    gender = st.sidebar.selectbox("Gender", ("Male", "Female"))
-    married = st.sidebar.selectbox("Married", ("Yes", "No"))
-    dependents = st.sidebar.selectbox("Dependents", ("0", "1", "2", "3+"))
-    education = st.sidebar.selectbox("Education", ("Graduate", "Not Graduate"))
-    self_employed = st.sidebar.selectbox("Self Employed", ("Yes", "No"))
-    applicant_income = st.sidebar.number_input("Applicant Income", min_value=0, value=5000)
-    coapplicant_income = st.sidebar.number_input("Coapplicant Income", min_value=0, value=0)
-    loan_amount = st.sidebar.number_input("Loan Amount", min_value=0, value=150)
-    loan_term = st.sidebar.selectbox("Loan Amount Term (months)", (360, 120, 180, 240, 300, 480))
-    credit_history = st.sidebar.selectbox("Credit History", (1.0, 0.0))
-    property_area = st.sidebar.selectbox("Property Area", ("Urban", "Semiurban", "Rural"))
-
-    data = {
-        'Gender': gender,
-        'Married': married,
-        'Dependents': dependents,
-        'Education': education,
-        'Self_Employed': self_employed,
-        'ApplicantIncome': applicant_income,
-        'CoapplicantIncome': coapplicant_income,
-        'LoanAmount': loan_amount,
-        'Loan_Amount_Term': loan_term,
-        'Credit_History': credit_history,
-        'Property_Area': property_area,
-        'Total_Income': applicant_income + coapplicant_income
-    }
-
-    df = pd.DataFrame(data, index=[0])
-
-    # Feature Engineering (must match training)
-    df['Log_Loan_Amount'] = np.log1p(df['LoanAmount'])
-    df['EMI'] = df['LoanAmount'] / (df['Loan_Amount_Term'] + 0.0001)
-    df['EMI_to_Income_Ratio'] = df['EMI'] / ((df['Total_Income'] / 12) + 0.0001)
-
-    return df
-
-input_df = user_input_features()
-
-# Show input summary
-with st.expander("📋 View Input Summary"):
-    st.dataframe(input_df, use_container_width=True)
-
-# Preprocess input (One-hot encoding)
-processed_input = pd.get_dummies(input_df)
-for col in feature_names:
-    if col not in processed_input.columns:
-        processed_input[col] = 0
-processed_input = processed_input[feature_names]
+# ─────────────────────────────────────────────
+# 1. Categorical columns that need encoding
+# ─────────────────────────────────────────────
+CAT_COLS = ['Gender', 'Married', 'Dependents', 'Education',
+            'Self_Employed', 'Property_Area']
 
 
-def get_shap_values_1d(explainer, processed_input, feature_names):
-    """Extract 1D SHAP values for the approved class from any SHAP format."""
-    shap_values = explainer.shap_values(processed_input)
+def encode_features(X_train: pd.DataFrame, X_test: pd.DataFrame):
+    """
+    Fit LabelEncoders on X_train only, then transform both splits.
+    Returns encoded DataFrames + the fitted encoder dict.
+    """
+    encoders = {}
+    X_train = X_train.copy()
+    X_test  = X_test.copy()
 
-    if isinstance(shap_values, list):
-        # Old format: list of arrays per class
-        vals = np.array(shap_values[1])
-        base_val = float(np.array(explainer.expected_value).flat[1])
-    else:
-        shap_values = np.array(shap_values)
-        if shap_values.ndim == 3:
-            # New format: (samples, features, classes)
-            vals = shap_values[:, :, 1]
-            base_val = float(np.array(explainer.expected_value).flat[1])
-        elif shap_values.ndim == 2:
-            vals = shap_values
-            base_val = float(np.array(explainer.expected_value).flat[0])
-        else:
-            vals = shap_values
-            base_val = float(explainer.expected_value)
-
-    # Always return a clean 1D array
-    vals_1d = np.array(vals).flatten()[:len(feature_names)]
-    return vals_1d, base_val
-
-
-def plot_waterfall(explanation):
-    fig, ax = plt.subplots()
-    shap.plots.waterfall(explanation, show=False)
-    return plt.gcf()
-
-
-def plot_bar_fallback(vals_1d, feature_names):
-    feat_importance = pd.DataFrame({
-        'Feature': list(feature_names),
-        'SHAP Value': vals_1d,
-        'Abs SHAP': np.abs(vals_1d)
-    }).sort_values('Abs SHAP', ascending=True).tail(12)
-
-    colors = ['#e74c3c' if v < 0 else '#2ecc71' for v in feat_importance['SHAP Value']]
-
-    fig, ax = plt.subplots(figsize=(8, 6))
-    bars = ax.barh(feat_importance['Feature'], feat_importance['SHAP Value'], color=colors)
-    ax.axvline(x=0, color='black', linewidth=0.8, linestyle='--')
-    ax.set_xlabel('SHAP Value (impact on model output)')
-    ax.set_title('Feature Impact on Prediction\n🟢 Pushes toward Approval   🔴 Pushes toward Rejection')
-    plt.tight_layout()
-    return fig
-
-
-# Predict button
-if st.button("🔍 Predict Eligibility", use_container_width=True):
-    prediction = model.predict(processed_input)
-    probability = model.predict_proba(processed_input)
-    approved = prediction[0] == 1
-    confidence = max(probability[0]) * 100
-
-    # Result display
-    st.markdown("---")
-    col1, col2 = st.columns([1, 2])
-
-    with col1:
-        st.markdown("### Prediction Result")
-        if approved:
-            st.success("✅ Loan Approved!")
-        else:
-            st.error("❌ Loan Rejected")
-
-        st.metric("Confidence", f"{confidence:.2f}%")
-        st.metric("Approval Probability", f"{probability[0][1]*100:.2f}%")
-        st.metric("Rejection Probability", f"{probability[0][0]*100:.2f}%")
-
-    with col2:
-        st.markdown("### 🔎 Why this decision? (SHAP Explanation)")
-
-        try:
-            vals_1d, base_val = get_shap_values_1d(explainer, processed_input, feature_names)
-
-            explanation = shap.Explanation(
-                values=vals_1d,
-                base_values=base_val,
-                data=processed_input.iloc[0].values,
-                feature_names=list(feature_names)
+    for col in CAT_COLS:
+        if col in X_train.columns:
+            le = LabelEncoder()
+            X_train[col] = le.fit_transform(X_train[col].astype(str))
+            # Handle unseen labels in test gracefully
+            X_test[col] = X_test[col].astype(str).map(
+                lambda v, le=le: le.transform([v])[0] if v in le.classes_ else -1
             )
+            encoders[col] = le
 
-            try:
-                fig = plot_waterfall(explanation)
-                st.pyplot(fig, use_container_width=True)
-                plt.clf()
-            except Exception as waterfall_err:
-                st.warning(f"Waterfall plot unavailable ({waterfall_err}), showing bar chart instead.")
-                fig = plot_bar_fallback(vals_1d, feature_names)
-                st.pyplot(fig, use_container_width=True)
-                plt.clf()
+    return X_train, X_test, encoders
 
-        except Exception as shap_err:
-            st.error(f"SHAP explanation failed: {shap_err}")
 
-    # SHAP values table
-    st.markdown("---")
-    st.markdown("### 📊 Detailed SHAP Values")
-    try:
-        shap_df = pd.DataFrame({
-            'Feature': list(feature_names),
-            'Input Value': processed_input.iloc[0].values,
-            'SHAP Value': vals_1d,
-            'Impact': ['🟢 Positive' if v > 0 else '🔴 Negative' for v in vals_1d]
-        }).sort_values('SHAP Value', ascending=False)
-        st.dataframe(shap_df, use_container_width=True)
-    except Exception:
-        pass
+# ─────────────────────────────────────────────
+# 2. GridSearchCV parameter grid
+# ─────────────────────────────────────────────
+PARAM_GRID = {
+    'n_estimators':  [100, 200, 300],
+    'max_depth':     [3, 4, 5],
+    'learning_rate': [0.01, 0.05, 0.1],
+    'subsample':     [0.7, 0.8, 0.9],
+    'colsample_bytree': [0.7, 0.8, 0.9],
+}
+
+
+def tune_xgboost(X_train, y_train, scale_pos_weight=1.0):
+    """
+    Run GridSearchCV with StratifiedKFold (handles class imbalance).
+    Optimises for F1 score. Returns the best estimator.
+    """
+    base_model = XGBClassifier(
+        eval_metric='logloss',
+        random_state=42,
+        n_jobs=-1,
+        scale_pos_weight=scale_pos_weight
+    )
+
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
+    print(f"\n[INFO] Running GridSearchCV with scale_pos_weight={scale_pos_weight:.4f}...")
+    grid_search = GridSearchCV(
+        estimator=base_model,
+        param_grid=PARAM_GRID,
+        cv=cv,
+        scoring='f1',   # F1 handles class imbalance better than accuracy
+        n_jobs=-1,
+        verbose=1,
+    )
+    grid_search.fit(X_train, y_train)
+
+    print(f"\n[INFO] Best params : {grid_search.best_params_}")
+    print(f"[INFO] Best CV F1  : {grid_search.best_score_:.4f}")
+    return grid_search.best_estimator_
+
+
+# ─────────────────────────────────────────────
+# 3. Main training pipeline
+# ─────────────────────────────────────────────
+def train():
+    # 3a. Load + clean + engineer features
+    print("[INFO] Loading and processing data...")
+    df = get_processed_data('data/raw/train.csv')
+
+    # 3b. Encode target label
+    df['Loan_Status'] = df['Loan_Status'].map({'Y': 1, 'N': 0})
+
+    # 3c. Stratified 80/20 split (preserves ~70/30 class ratio)
+    X_train, X_test, y_train, y_test = split_data(df, target_col='Loan_Status')
+
+    # 3d. Label-encode categoricals (fit on train, transform test)
+    print("[INFO] Encoding categorical features...")
+    X_train, X_test, encoders = encode_features(X_train, X_test)
+
+    # Ensure all columns are numeric
+    X_train = X_train.apply(pd.to_numeric, errors='coerce').fillna(0)
+    X_test  = X_test.apply(pd.to_numeric, errors='coerce').fillna(0)
+
+    print(f"\n[INFO] Class distribution in train : {dict(y_train.value_counts())}")
+    print(f"[INFO] Features used               : {list(X_train.columns)}\n")
+
+    # 3e. Calculate scale_pos_weight (Negative / Positive)
+    # Since 1 is Approved (Majority) and 0 is Rejected (Minority),
+    # scale_pos_weight should be < 1 to balance them if we consider 1 as positive.
+    # XGBoost: scale_pos_weight = sum(negative instances) / sum(positive instances)
+    counts = y_train.value_counts()
+    neg_count = counts.get(0, 0)
+    pos_count = counts.get(1, 1) # Avoid div by zero
+    spw = neg_count / pos_count
+
+    # 3f. Hyperparameter search
+    model = tune_xgboost(X_train, y_train, scale_pos_weight=spw)
+
+    # 3f. Evaluate on held-out test set
+    y_pred = model.predict(X_test)
+    acc    = accuracy_score(y_test, y_pred)
+
+    print("\n" + "=" * 55)
+    print("  TEST SET RESULTS")
+    print("=" * 55)
+    print(f"  Accuracy : {acc * 100:.2f}%")
+    print("\n  Classification Report:")
+    print(classification_report(y_test, y_pred,
+                                target_names=['Rejected (0)', 'Approved (1)']))
+    print("  Confusion Matrix:")
+    print(confusion_matrix(y_test, y_pred))
+    print("=" * 55)
+
+    # 3g. Save all artifacts
+    os.makedirs('models', exist_ok=True)
+
+    joblib.dump(model,                    'models/loan_model.pkl')
+    joblib.dump(encoders,                 'models/label_encoders.pkl')
+    joblib.dump(X_train.columns.tolist(), 'models/feature_names.pkl')
+
+    print("\n[INFO] Generating SHAP TreeExplainer...")
+    explainer = shap.TreeExplainer(model)
+    joblib.dump(explainer, 'models/explainer.pkl')
+
+    print("\n[DONE] All artifacts saved to models/")
+    print("       -> loan_model.pkl")
+    print("       -> label_encoders.pkl")
+    print("       -> feature_names.pkl")
+    print("       -> explainer.pkl")
+
+
+if __name__ == '__main__':
+    train()

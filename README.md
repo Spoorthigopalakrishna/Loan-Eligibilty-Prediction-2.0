@@ -1,140 +1,137 @@
-# 🏦 Loan Prediction 2.0
+# Loan Eligibility Prediction 2.0
 
-A machine learning application that predicts loan eligibility with explainable AI (SHAP) insights. This project combines predictive modeling with interpretability to help understand why loans are approved or rejected.
+A production-ready machine learning application that predicts loan eligibility with **XGBoost** and **SHAP**-powered explainability. Built to go beyond a simple ML model — every prediction comes with a clear, human-readable explanation of *why*.
 
-## 🎯 Features
+## Features
 
-- **Machine Learning Predictions**: Predicts loan eligibility based on customer financial profiles
-- **SHAP Explainability**: Provides detailed analysis of feature contributions to each prediction
-- **Interactive Dashboard**: Streamlit-based web interface for real-time predictions
-- **Robust Visualizations**: Multiple SHAP visualization options (waterfall, bar charts, feature importance)
-- **Data Processing Pipeline**: Automated feature engineering and data preprocessing
-- **Model Persistence**: Saves trained models and SHAP explainers for reproducibility
+- **XGBoost Model**: Gradient-boosted tree model tuned with GridSearchCV (85%+ accuracy)
+- **SHAP Explainability**: Waterfall plots and feature contribution tables per prediction
+- **Imbalance-Aware**: F1-optimised training with StratifiedKFold cross-validation
+- **Interpretable Pipeline**: LabelEncoded raw features — no PCA, so every SHAP value maps to a real feature
+- **Interactive Dashboard**: Real-time Streamlit app with sidebar inputs and instant predictions
 
-## 🛠 Tech Stack
+## Tech Stack
 
-- **Python 3.8+**
-- **scikit-learn**: Machine Learning
-- **SHAP v0.20+**: Model Explainability
-- **Streamlit**: Interactive Dashboard
-- **Pandas & NumPy**: Data Processing
-- **Matplotlib**: Visualization
+| Layer | Library |
+|---|---|
+| Model | XGBoost |
+| Explainability | SHAP |
+| Dashboard | Streamlit |
+| Hyperparameter Tuning | scikit-learn GridSearchCV |
+| Data | Pandas, NumPy |
+| Serialisation | joblib |
 
-## 📁 Project Structure
+## Project Structure
 
 ```
-├── app.py                      # Streamlit dashboard application
-├── train_model.py              # Model training and evaluation script
-├── data_processing.py          # Data cleaning and feature engineering
-├── requirements.txt            # Python dependencies
-├── .gitignore                  # Git ignore rules
-├── README.md                   # This file
+Loan-Eligibilty-Prediction-2.0/
+├── app.py                         # Streamlit dashboard (entry point)
+├── requirements.txt               # All dependencies
+├── README.md                      # This file
+├── .gitignore
+├── src/
+│   ├── __init__.py
+│   ├── data_processing.py         # Cleaning, feature engineering, stratified split
+│   └── train_model.py             # XGBoost training, GridSearchCV, SHAP artifacts
 ├── data/
-│   ├── train.csv              # Raw training dataset
-│   └── processed_train.csv    # Processed dataset
+│   ├── raw/
+│   │   └── train.csv              # Original dataset (immutable)
+│   └── processed/
+│       └── processed_train.csv    # Engineered features output
 └── models/
-    ├── loan_model.pkl         # Trained ML model
-    ├── explainer.pkl          # SHAP explainer object
-    └── feature_names.pkl      # Feature names for consistency
+    ├── loan_model.pkl             # Trained XGBoost model
+    ├── explainer.pkl              # SHAP TreeExplainer
+    ├── feature_names.pkl          # Feature column order (for inference alignment)
+    └── label_encoders.pkl         # Fitted LabelEncoders (fit on train only)
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
-### Prerequisites
-- Python 3.8 or higher
-- pip or conda
+### 1. Clone & install
 
-### Installation
+```bash
+git clone https://github.com/Spoorthigopalakrishna/Loan-Eligibilty-Prediction-2.0.git
+cd Loan-Eligibilty-Prediction-2.0
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/Loan-Prediction-2.0.git
-   cd Loan-Prediction-2.0
-   ```
+python -m venv venv
+venv\Scripts\activate        # Windows
+# source venv/bin/activate   # macOS/Linux
 
-2. **Create virtual environment** (recommended):
-   ```bash
-   # Windows
-   python -m venv venv
-   venv\Scripts\activate
-   
-   # macOS/Linux
-   python -m venv venv
-   source venv/bin/activate
-   ```
+pip install -r requirements.txt
+```
 
-3. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
+### 2. Train the model
 
-### Usage
+```bash
+python src/train_model.py
+```
 
-1. **Train the model** (first time or after data updates):
-   ```bash
-   python train_model.py
-   ```
-   This will:
-   - Load and process training data
-   - Train the model
-   - Generate SHAP explainer
-   - Save artifacts to `models/` directory
+This runs the full pipeline:
+- Loads `data/raw/train.csv` → cleans → engineers features
+- Stratified 80/20 split
+- GridSearchCV over XGBoost hyperparameters (54 candidates × 5-fold CV)
+- Prints full classification report (precision / recall / F1)
+- Saves 4 artifacts to `models/`
 
-2. **Launch the dashboard**:
-   ```bash
-   streamlit run app.py
-   ```
-   - Open your browser to `http://localhost:8501`
-   - Enter customer details in the sidebar
-   - Click "Predict Eligibility" to see predictions and explanations
+### 3. Launch the app
 
-## 📊 Understanding the Dashboard
+```bash
+streamlit run app.py
+```
 
-- **Prediction Result**: Shows whether the loan is approved or rejected
-- **Confidence Score**: Displays model confidence percentage
-- **SHAP Explanation**: 
-  - **Waterfall Plot**: Shows cumulative feature contributions (base value → prediction)
-  - **Feature Importance Bar Chart**: Top 10 most impactful features
-  - **Feature Values Table**: Raw SHAP values for all features
+Open `http://localhost:8501` in your browser.
 
-## 🔄 Model Pipeline
+## Model Performance (Phase 3)
 
-1. **Data Processing** → Feature engineering, encoding, scaling
-2. **Model Training** → Classification model (defaults to Logistic Regression/Random Forest)
-3. **SHAP Analysis** → Generate SHAP explainer for interpretability
-4. **Dashboard Display** → Real-time predictions with explanations
+Evaluated on a held-out 20% stratified test set:
 
-## 📝 Version History
+| Metric | Value |
+|---|---|
+| Accuracy | **83.74%** |
+| Approved — Recall | **91%** |
+| Rejected — Recall | **68%** |
 
-### Phase 1 — Data Pipeline (Current)
-- ✅ SHAP v0.20 compatibility update
-- ✅ Robust visualization with intelligent fallbacks
-- ✅ Waterfall plot primary visualization
-- ✅ Feature importance bar charts as fallback
-- ✅ Git repository and .gitignore setup
+**Best hyperparameters** found by GridSearchCV:
+```
+learning_rate=0.01, max_depth=3, n_estimators=100, subsample=0.8, colsample_bytree=0.9
+```
 
-## 🐛 Troubleshooting
+> **Class Imbalance Handling**: Phase 3 introduced `scale_pos_weight` and F1-optimisation, which increased rejection recall from **0.55 to 0.68** (+13%). This makes the model much more robust at identifying high-risk loan applications.
 
-**SHAP Visualization Issues**:
-- If force plot fails, the app automatically falls back to waterfall plot
-- If waterfall plot fails, feature importance bar chart is shown
-- If all fail, raw SHAP values are displayed in a table
+## How Predictions Work
 
-**Model Not Found**:
-- Run `python train_model.py` first to generate model artifacts
+1. User fills in the sidebar form
+2. Feature engineering runs in-app (Total Income, EMI, Log Loan Amount, EMI-to-Income Ratio)
+3. Categorical columns are label-encoded using the saved `label_encoders.pkl`
+4. XGBoost predicts approval probability
+5. SHAP TreeExplainer decomposes the prediction into per-feature contributions
+6. Waterfall plot (or bar chart fallback) shows *why* the decision was made
 
-**Dependencies Issues**:
-- Ensure virtual environment is activated
-- Run `pip install -r requirements.txt` again
+## Version History
 
-## 📄 License
+### Phase 2 — XGBoost Model (Current)
+- Replaced RandomForest with a tuned XGBoost classifier
+- Dropped PCA — raw features preserved for SHAP interpretability
+- Switched from `pd.get_dummies` to `LabelEncoder` (fit on train only, no leakage)
+- Added GridSearchCV hyperparameter search (n_estimators, max_depth, learning_rate, subsample)
+- Full classification report with precision/recall/F1 per class
+- Added `label_encoders.pkl` artifact; updated inference pipeline in `app.py`
 
-This project is open source and available under the MIT License.
+### Phase 1 — Data Pipeline
+- SHAP v0.20 compatibility with waterfall/bar chart fallback
+- Automated feature engineering pipeline (Total Income, EMI, Log Loan Amount)
+- Modular `src/` structure with `data_processing.py` and `train_model.py`
+- Stratified 80/20 split, mode/median imputation
 
-## 👤 Author
+## Troubleshooting
 
-Created as a personal project for loan eligibility prediction and machine learning explainability.
+| Problem | Fix |
+|---|---|
+| `Model files not found` | Run `python src/train_model.py` first |
+| `label_encoders.pkl not found` | Re-run training — old models won't have this artifact |
+| SHAP waterfall fails | App auto-falls back to bar chart, then raw table |
+| Unseen category in inference | Encoded as `-1` (handled gracefully) |
 
-## 🙋 Support
+## License
 
-For issues or questions, please open an issue on GitHub or contact the project maintainer.
+MIT — open source, free to use and modify.
