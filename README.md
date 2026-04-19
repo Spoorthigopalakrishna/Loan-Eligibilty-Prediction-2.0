@@ -1,137 +1,98 @@
-# Loan Eligibility Prediction 2.0
+# 🏦 Loan Eligibility Prediction 2.0
 
-A production-ready machine learning application that predicts loan eligibility with **XGBoost** and **SHAP**-powered explainability. Built to go beyond a simple ML model — every prediction comes with a clear, human-readable explanation of *why*.
+A professional-grade machine learning application designed to predict loan eligibility with high accuracy and full transparency. This project utilizes **XGBoost** for predictive power and **SHAP** for explainable AI (XAI) insights.
 
-## Features
+[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
+[![XGBoost](https://img.shields.io/badge/Model-XGBoost-orange.svg)](https://xgboost.readthedocs.io/)
+[![SHAP](https://img.shields.io/badge/XAI-SHAP-green.svg)](https://shap.readthedocs.io/)
+[![Streamlit](https://img.shields.io/badge/UI-Streamlit-red.svg)](https://streamlit.io/)
 
-- **XGBoost Model**: Gradient-boosted tree model tuned with GridSearchCV (85%+ accuracy)
-- **SHAP Explainability**: Waterfall plots and feature contribution tables per prediction
-- **Imbalance-Aware**: F1-optimised training with StratifiedKFold cross-validation
-- **Interpretable Pipeline**: LabelEncoded raw features — no PCA, so every SHAP value maps to a real feature
-- **Interactive Dashboard**: Real-time Streamlit app with sidebar inputs and instant predictions
+## 🎯 Project Highlights
 
-## Tech Stack
+- **Predictive Power**: XGBoost classifier tuned via GridSearchCV (83.7% Accuracy).
+- **Transparency**: Every prediction is accompanied by a SHAP explanation (Waterfall & Force plots).
+- **Imbalance-Aware**: Optimized for **F1-Score** using `scale_pos_weight` to better identify high-risk rejections.
+- **Robust Pipeline**: Modular source code with automated feature engineering and consistent LabelEncoding.
+- **Interactive Dashboard**: Real-time inference with a feature-rich Streamlit UI.
 
-| Layer | Library |
-|---|---|
-| Model | XGBoost |
-| Explainability | SHAP |
-| Dashboard | Streamlit |
-| Hyperparameter Tuning | scikit-learn GridSearchCV |
-| Data | Pandas, NumPy |
-| Serialisation | joblib |
-
-## Project Structure
+## 📁 Project Structure
 
 ```
 Loan-Eligibilty-Prediction-2.0/
-├── app.py                         # Streamlit dashboard (entry point)
-├── requirements.txt               # All dependencies
-├── README.md                      # This file
-├── .gitignore
+├── app.py                         # Streamlit entry point
+├── HOW_IT_WORKS.md                # Detailed technical guide
 ├── src/
-│   ├── __init__.py
-│   ├── data_processing.py         # Cleaning, feature engineering, stratified split
-│   └── train_model.py             # XGBoost training, GridSearchCV, SHAP artifacts
+│   ├── data_processing.py         # Feature engineering & cleaning
+│   └── train_model.py             # XGBoost training & SHAP generation
 ├── data/
-│   ├── raw/
-│   │   └── train.csv              # Original dataset (immutable)
-│   └── processed/
-│       └── processed_train.csv    # Engineered features output
+│   ├── raw/                       # Immutable source data
+│   └── processed/                 # Engineered feature storage
 └── models/
-    ├── loan_model.pkl             # Trained XGBoost model
+    ├── loan_model.pkl             # Trained XGBoost artifact
     ├── explainer.pkl              # SHAP TreeExplainer
-    ├── feature_names.pkl          # Feature column order (for inference alignment)
-    └── label_encoders.pkl         # Fitted LabelEncoders (fit on train only)
+    ├── label_encoders.pkl         # Fitted category encoders
+    └── shap_summary_plot.png      # Global importance visualization
 ```
 
-## Quick Start
+## 🚀 Quick Start
 
-### 1. Clone & install
-
+### 1. Installation
 ```bash
 git clone https://github.com/Spoorthigopalakrishna/Loan-Eligibilty-Prediction-2.0.git
 cd Loan-Eligibilty-Prediction-2.0
-
 python -m venv venv
-venv\Scripts\activate        # Windows
-# source venv/bin/activate   # macOS/Linux
-
+# Activate: .\venv\Scripts\activate (Win) or source venv/bin/activate (Mac)
 pip install -r requirements.txt
 ```
 
-### 2. Train the model
-
+### 2. Training (Optional)
 ```bash
 python src/train_model.py
 ```
+This will retrain the XGBoost model, perform GridSearchCV, and regenerate the SHAP explainer and global summary plots.
 
-This runs the full pipeline:
-- Loads `data/raw/train.csv` → cleans → engineers features
-- Stratified 80/20 split
-- GridSearchCV over XGBoost hyperparameters (54 candidates × 5-fold CV)
-- Prints full classification report (precision / recall / F1)
-- Saves 4 artifacts to `models/`
-
-### 3. Launch the app
-
+### 3. Launch App
 ```bash
 streamlit run app.py
 ```
 
-Open `http://localhost:8501` in your browser.
-
-## Model Performance (Phase 3)
-
-Evaluated on a held-out 20% stratified test set:
+## 📊 Performance Metrics (Phase 3)
 
 | Metric | Value |
 |---|---|
-| Accuracy | **83.74%** |
-| Approved — Recall | **91%** |
-| Rejected — Recall | **68%** |
+| **Overall Accuracy** | 83.74% |
+| **Approved (Recall)** | 91.00% |
+| **Rejected (Recall)** | 68.00% |
+| **Scoring Target** | F1-Score (Macro) |
 
-**Best hyperparameters** found by GridSearchCV:
-```
-learning_rate=0.01, max_depth=3, n_estimators=100, subsample=0.8, colsample_bytree=0.9
-```
+*Tuned with: `learning_rate=0.01, max_depth=3, n_estimators=100, subsample=0.8, colsample_bytree=0.9`*
 
-> **Class Imbalance Handling**: Phase 3 introduced `scale_pos_weight` and F1-optimisation, which increased rejection recall from **0.55 to 0.68** (+13%). This makes the model much more robust at identifying high-risk loan applications.
+## 🔎 Interpretability Features
 
-## How Predictions Work
+The dashboard provides three layers of explanation:
+1. **Waterfall Plot**: Deconstructs the probability score from base value to final prediction.
+2. **Interactive Force Plot**: Visualizes the tug-of-war between approval and rejection factors.
+3. **Global Summary**: An expander showing overall feature importance across the entire dataset.
 
-1. User fills in the sidebar form
-2. Feature engineering runs in-app (Total Income, EMI, Log Loan Amount, EMI-to-Income Ratio)
-3. Categorical columns are label-encoded using the saved `label_encoders.pkl`
-4. XGBoost predicts approval probability
-5. SHAP TreeExplainer decomposes the prediction into per-feature contributions
-6. Waterfall plot (or bar chart fallback) shows *why* the decision was made
+## 📝 Version History
 
-## Version History
+### Phase 3 — Explainability (Current)
+- ✅ Integrated **SHAP TreeExplainer** for granular model transparency.
+- ✅ Added interactive **Force Plots** and **Waterfall Plots** to UI.
+- ✅ Optimized for **Class Imbalance** (increased rejection recall by 13%).
+- ✅ Automated Global Summary plot generation.
 
-### Phase 2 — XGBoost Model (Current)
-- Replaced RandomForest with a tuned XGBoost classifier
-- Dropped PCA — raw features preserved for SHAP interpretability
-- Switched from `pd.get_dummies` to `LabelEncoder` (fit on train only, no leakage)
-- Added GridSearchCV hyperparameter search (n_estimators, max_depth, learning_rate, subsample)
-- Full classification report with precision/recall/F1 per class
-- Added `label_encoders.pkl` artifact; updated inference pipeline in `app.py`
+### Phase 2 — XGBoost Model
+- ✅ Transitioned from RandomForest to **XGBoost**.
+- ✅ Implemented **LabelEncoder** for consistent train/inference mapping.
+- ✅ Integrated **GridSearchCV** for hyperparameter optimization.
 
 ### Phase 1 — Data Pipeline
-- SHAP v0.20 compatibility with waterfall/bar chart fallback
-- Automated feature engineering pipeline (Total Income, EMI, Log Loan Amount)
-- Modular `src/` structure with `data_processing.py` and `train_model.py`
-- Stratified 80/20 split, mode/median imputation
+- ✅ Established modular `src/` architecture.
+- ✅ Built robust feature engineering (Total Income, EMI, Log Loan Amount).
 
-## Troubleshooting
+## 📄 License
+MIT License - See [LICENSE](LICENSE) for details.
 
-| Problem | Fix |
-|---|---|
-| `Model files not found` | Run `python src/train_model.py` first |
-| `label_encoders.pkl not found` | Re-run training — old models won't have this artifact |
-| SHAP waterfall fails | App auto-falls back to bar chart, then raw table |
-| Unseen category in inference | Encoded as `-1` (handled gracefully) |
-
-## License
-
-MIT — open source, free to use and modify.
+## 👤 Author
+**Spoorthi Gopalakrishna** - [GitHub Profile](https://github.com/Spoorthigopalakrishna)

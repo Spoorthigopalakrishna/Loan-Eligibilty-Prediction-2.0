@@ -1,11 +1,9 @@
 """
-Phase 2 -- Model Training (XGBoost)
+Phase 3 -- Explainability (SHAP)
 =====================================
-- Raw features (no PCA) for SHAP interpretability
-- LabelEncoder fitted on train, applied to test
-- GridSearchCV hyperparameter tuning (n_estimators, max_depth, learning_rate)
-- Full classification report (precision / recall / F1)
-- Saves: loan_model.pkl, explainer.pkl, feature_names.pkl, label_encoders.pkl
+- Uses shap.TreeExplainer for XGBoost
+- Generates global summary plot
+- Saves explainer and model artifacts
 """
 
 import os
@@ -18,6 +16,7 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from xgboost import XGBClassifier
 import shap
+import matplotlib.pyplot as plt
 
 # Allow running from repo root: python src/train_model.py
 sys.path.insert(0, os.path.dirname(__file__))
@@ -153,15 +152,24 @@ def train():
     joblib.dump(encoders,                 'models/label_encoders.pkl')
     joblib.dump(X_train.columns.tolist(), 'models/feature_names.pkl')
 
-    print("\n[INFO] Generating SHAP TreeExplainer...")
+    print("\n[INFO] Generating SHAP TreeExplainer and global plots...")
     explainer = shap.TreeExplainer(model)
     joblib.dump(explainer, 'models/explainer.pkl')
+
+    # Generate and save global summary plot
+    shap_values = explainer.shap_values(X_train)
+    plt.figure(figsize=(10, 6))
+    shap.summary_plot(shap_values, X_train, show=False)
+    plt.tight_layout()
+    plt.savefig('models/shap_summary_plot.png')
+    plt.close()
 
     print("\n[DONE] All artifacts saved to models/")
     print("       -> loan_model.pkl")
     print("       -> label_encoders.pkl")
     print("       -> feature_names.pkl")
     print("       -> explainer.pkl")
+    print("       -> shap_summary_plot.png")
 
 
 if __name__ == '__main__':

@@ -1,5 +1,5 @@
 """
-app.py — Loan Eligibility Predictor (Phase 2: XGBoost + SHAP)
+app.py — Loan Eligibility Predictor (Phase 3: Explainability)
 """
 
 import streamlit as st
@@ -8,6 +8,7 @@ import numpy as np
 import joblib
 import shap
 import matplotlib.pyplot as plt
+import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Loan Eligibility Predictor", layout="wide")
 
@@ -137,6 +138,12 @@ processed_input = preprocess_input(input_df)
 # ─────────────────────────────────────────────
 # SHAP helpers
 # ─────────────────────────────────────────────
+def st_shap(plot, height=None):
+    """Render a SHAP force plot in Streamlit."""
+    shap_html = f"<head>{shap.getjs()}</head><body>{plot.html()}</body>"
+    components.html(shap_html, height=height)
+
+
 def get_shap_values_1d(explainer, processed_input, feature_names):
     """Extract 1D SHAP values for the Approved class (class 1)."""
     shap_values = explainer.shap_values(processed_input)
@@ -210,7 +217,10 @@ if st.button("🔍 Predict Eligibility", use_container_width=True):
     base_val = None
 
     with col2:
-        st.markdown("### 🔎 Why this decision? (SHAP Explanation)")
+        st.markdown("### 🔎 Why this decision? (Local Explanation)")
+        
+        tab1, tab2, tab3 = st.tabs(["Waterfall Plot", "Force Plot", "Bar Chart"])
+        
         try:
             vals_1d, base_val = get_shap_values_1d(explainer, processed_input, feature_names)
             explanation = shap.Explanation(
@@ -219,17 +229,53 @@ if st.button("🔍 Predict Eligibility", use_container_width=True):
                 data=processed_input.iloc[0].values,
                 feature_names=list(feature_names),
             )
-            try:
-                fig = plot_waterfall(explanation)
-                st.pyplot(fig, use_container_width=True)
-                plt.clf()
-            except Exception as waterfall_err:
-                st.warning(f"Waterfall plot unavailable ({waterfall_err}), showing bar chart instead.")
+            
+            with tab1:
+                try:
+                    fig = plot_waterfall(explanation)
+                    st.pyplot(fig, use_container_width=True)
+                    plt.clf()
+                except Exception as e:
+                    st.error(f"Waterfall plot failed: {e}")
+            
+            with tab2:
+                try:
+                    # Force plot for single observation
+                    p = shap.force_plot(
+                        base_val, 
+                        vals_1d, 
+                        processed_input.iloc[0], 
+                        feature_names=list(feature_names),
+                        matplotlib=False
+                    )
+                    st_shap(p, height=200)
+                except Exception as e:
+                    st.error(f"Force plot failed: {e}")
+            
+            with tab3:
                 fig = plot_bar_fallback(vals_1d, feature_names)
                 st.pyplot(fig, use_container_width=True)
                 plt.clf()
+                
         except Exception as shap_err:
             st.error(f"SHAP explanation failed: {shap_err}")
+
+    # Global Context Section
+    st.markdown("---")
+    with st.expander("🌍 View Global Model Importance (Summary Plot)"):
+        try:
+            st.image('models/shap_summary_plot.png', caption='Global SHAP Summary (Impact on Approval)')
+            st.markdown("""
+                **How to read this plot:**
+                - **Features** are ranked by importance (top to bottom).
+                - **Each dot** is a borrower from the training set.
+                - **Color** represents the feature value (Red=High, Blue=Low).
+                - **Horizontal Position** (SHAP value) shows impact:
+                    - Positive (right): Pushes model towards **Approval**.
+                    - Negative (left): Pushes model towards **Rejection**.
+            """)
+        except Exception:
+            st.warning("Global summary plot not found. Run `python src/train_model.py` to generate it.")
 
     # SHAP values table
     st.markdown("---")
