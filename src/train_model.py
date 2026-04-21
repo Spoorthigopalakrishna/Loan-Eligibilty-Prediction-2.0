@@ -97,9 +97,14 @@ def tune_xgboost(X_train, y_train, scale_pos_weight=1.0):
 # 3. Main training pipeline
 # ─────────────────────────────────────────────
 def train():
+    # Define absolute paths relative to the script location
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    DATA_PATH = os.path.join(BASE_DIR, 'data', 'raw', 'train.csv')
+    MODELS_DIR = os.path.join(BASE_DIR, 'models')
+    
     # 3a. Load + clean + engineer features
-    print("[INFO] Loading and processing data...")
-    df = get_processed_data('data/raw/train.csv')
+    print(f"[INFO] Loading data from {DATA_PATH}...")
+    df = get_processed_data(DATA_PATH)
 
     # 3b. Encode target label
     df['Loan_Status'] = df['Loan_Status'].map({'Y': 1, 'N': 0})
@@ -118,58 +123,70 @@ def train():
     print(f"\n[INFO] Class distribution in train : {dict(y_train.value_counts())}")
     print(f"[INFO] Features used               : {list(X_train.columns)}\n")
 
-    # 3e. Calculate scale_pos_weight (Negative / Positive)
-    # Since 1 is Approved (Majority) and 0 is Rejected (Minority),
-    # scale_pos_weight should be < 1 to balance them if we consider 1 as positive.
-    # XGBoost: scale_pos_weight = sum(negative instances) / sum(positive instances)
+    # 3e. Calculate scale_pos_weight
     counts = y_train.value_counts()
     neg_count = counts.get(0, 0)
-    pos_count = counts.get(1, 1) # Avoid div by zero
+    pos_count = counts.get(1, 1)
     spw = neg_count / pos_count
 
     # 3f. Hyperparameter search
     model = tune_xgboost(X_train, y_train, scale_pos_weight=spw)
 
-    # 3f. Evaluate on held-out test set
+    # Evaluate on held-out test set
     y_pred = model.predict(X_test)
     acc    = accuracy_score(y_test, y_pred)
+    from sklearn.metrics import f1_score
+    f1 = f1_score(y_test, y_pred)
+    cm = confusion_matrix(y_test, y_pred)
 
     print("\n" + "=" * 55)
     print("  TEST SET RESULTS")
     print("=" * 55)
     print(f"  Accuracy : {acc * 100:.2f}%")
+    print(f"  F1 Score : {f1:.4f}")
     print("\n  Classification Report:")
     print(classification_report(y_test, y_pred,
                                 target_names=['Rejected (0)', 'Approved (1)']))
     print("  Confusion Matrix:")
-    print(confusion_matrix(y_test, y_pred))
+    print(cm)
     print("=" * 55)
 
     # 3g. Save all artifacts
-    os.makedirs('models', exist_ok=True)
+    os.makedirs(MODELS_DIR, exist_ok=True)
+    
+    # Save metrics
+    metrics = {
+        'accuracy': acc,
+        'f1_score': f1,
+        'confusion_matrix': cm
+    }
+    joblib.dump(metrics, os.path.join(MODELS_DIR, 'metrics.pkl'))
 
-    joblib.dump(model,                    'models/loan_model.pkl')
-    joblib.dump(encoders,                 'models/label_encoders.pkl')
-    joblib.dump(X_train.columns.tolist(), 'models/feature_names.pkl')
+    joblib.dump(model,                    os.path.join(MODELS_DIR, 'loan_model.pkl'))
+    joblib.dump(encoders,                 os.path.join(MODELS_DIR, 'label_encoders.pkl'))
+    joblib.dump(X_train.columns.tolist(), os.path.join(MODELS_DIR, 'feature_names.pkl'))
 
     print("\n[INFO] Generating SHAP TreeExplainer and global plots...")
     explainer = shap.TreeExplainer(model)
-    joblib.dump(explainer, 'models/explainer.pkl')
+    joblib.dump(explainer, os.path.join(MODELS_DIR, 'explainer.pkl'))
 
     # Generate and save global summary plot
     shap_values = explainer.shap_values(X_train)
     plt.figure(figsize=(10, 6))
     shap.summary_plot(shap_values, X_train, show=False)
     plt.tight_layout()
-    plt.savefig('models/shap_summary_plot.png')
+    plt.savefig(os.path.join(MODELS_DIR, 'shap_summary_plot.png'))
     plt.close()
 
-    print("\n[DONE] All artifacts saved to models/")
-    print("       -> loan_model.pkl")
-    print("       -> label_encoders.pkl")
-    print("       -> feature_names.pkl")
-    print("       -> explainer.pkl")
-    print("       -> shap_summary_plot.png")
+    # Generate and save Confusion Matrix plot
+    from sklearn.metrics import ConfusionMatrixDisplay
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ConfusionMatrixDisplay.from_predictions(y_test, y_pred, display_labels=['Rejected', 'Approved'], ax=ax, cmap='Blues')
+    plt.title("Confusion Matrix (Test Set)")
+    plt.savefig(os.path.join(MODELS_DIR, 'confusion_matrix.png'))
+    plt.close()
+
+    print(f"\n[DONE] All artifacts saved to {MODELS_DIR}")
 
 
 if __name__ == '__main__':

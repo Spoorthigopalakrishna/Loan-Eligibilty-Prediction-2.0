@@ -13,7 +13,7 @@ A professional-grade machine learning application designed to predict loan eligi
 - **Transparency**: Every prediction is accompanied by a SHAP explanation (Waterfall & Force plots).
 - **Imbalance-Aware**: Optimized for **F1-Score** using `scale_pos_weight` to better identify high-risk rejections.
 - **Robust Pipeline**: Modular source code with automated feature engineering and consistent LabelEncoding.
-- **Interactive Dashboard**: Real-time inference with a feature-rich Streamlit UI.
+- **Polished UI (Phase 4)**: A high-fidelity dashboard with real-time metrics tracking and intuitive form controls.
 
 ## 📁 Project Structure
 
@@ -23,13 +23,14 @@ Loan-Eligibilty-Prediction-2.0/
 ├── HOW_IT_WORKS.md                # Detailed technical guide
 ├── src/
 │   ├── data_processing.py         # Feature engineering & cleaning
-│   └── train_model.py             # XGBoost training & SHAP generation
+│   └── train_model.py             # XGBoost training & metrics generation
 ├── data/
-│   ├── raw/                       # Immutable source data
-│   └── processed/                 # Engineered feature storage
+│   ├── raw/                       # Immutable source data (train.csv)
 └── models/
     ├── loan_model.pkl             # Trained XGBoost artifact
     ├── explainer.pkl              # SHAP TreeExplainer
+    ├── metrics.pkl                # Accuracy, F1, and Confusion Matrix data
+    ├── confusion_matrix.png       # Test set performance visualization
     ├── label_encoders.pkl         # Fitted category encoders
     └── shap_summary_plot.png      # Global importance visualization
 ```
@@ -45,25 +46,25 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
-### 2. Training (Optional)
+### 2. Training (Required for Metrics)
 ```bash
 python src/train_model.py
 ```
-This will retrain the XGBoost model, perform GridSearchCV, and regenerate the SHAP explainer and global summary plots.
+This will retrain the XGBoost model, perform GridSearchCV, and generate the `metrics.pkl` and `confusion_matrix.png` required for the dashboard.
 
 ### 3. Launch App
 ```bash
 streamlit run app.py
 ```
 
-## 📊 Performance Metrics (Phase 3)
+## 📊 Performance Metrics
 
 | Metric | Value |
 |---|---|
 | **Overall Accuracy** | 83.74% |
+| **F1-Score (Macro)** | 0.8021 |
 | **Approved (Recall)** | 91.00% |
 | **Rejected (Recall)** | 68.00% |
-| **Scoring Target** | F1-Score (Macro) |
 
 *Tuned with: `learning_rate=0.01, max_depth=3, n_estimators=100, subsample=0.8, colsample_bytree=0.9`*
 
@@ -71,25 +72,26 @@ streamlit run app.py
 
 The dashboard provides three layers of explanation:
 1. **Waterfall Plot**: Deconstructs the probability score from base value to final prediction.
-2. **Interactive Force Plot**: Visualizes the tug-of-war between approval and rejection factors.
-3. **Global Summary**: An expander showing overall feature importance across the entire dataset.
+2. **Result Badges**: High-visibility status indicators (Approved/Rejected) with confidence percentages.
+3. **Sidebar Analytics**: Live view of model accuracy and confusion matrix from the latest test run.
 
 ## 📝 Version History
 
-### Phase 3 — Explainability (Current)
+### Phase 4 — Polished UI & Monitoring (Current)
+- ✅ Redesigned input form for better main-panel ergonomics.
+- ✅ Added **Result Badges** and **Confidence Progress Bars**.
+- ✅ Integrated **Live Metrics Sidebar** with Confusion Matrix visualization.
+- ✅ Automated performance artifact generation (`metrics.pkl`).
+
+### Phase 3 — Explainability (SHAP)
 - ✅ Integrated **SHAP TreeExplainer** for granular model transparency.
 - ✅ Added interactive **Force Plots** and **Waterfall Plots** to UI.
 - ✅ Optimized for **Class Imbalance** (increased rejection recall by 13%).
-- ✅ Automated Global Summary plot generation.
 
 ### Phase 2 — XGBoost Model
 - ✅ Transitioned from RandomForest to **XGBoost**.
 - ✅ Implemented **LabelEncoder** for consistent train/inference mapping.
 - ✅ Integrated **GridSearchCV** for hyperparameter optimization.
-
-### Phase 1 — Data Pipeline
-- ✅ Established modular `src/` architecture.
-- ✅ Built robust feature engineering (Total Income, EMI, Log Loan Amount).
 
 ## 📄 License
 MIT License - See [LICENSE](LICENSE) for details.

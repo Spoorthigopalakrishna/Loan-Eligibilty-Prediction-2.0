@@ -58,8 +58,18 @@ def get_processed_data(file_path: str = 'data/raw/train.csv') -> pd.DataFrame:
     df = clean_data(df)
     df = feature_engineering(df)
 
-    df.to_csv('data/processed/processed_train.csv', index=False)
-    print("[INFO] Processed dataset saved -> data/processed/processed_train.csv")
+    # Save to a directory relative to the input file_path if possible
+    try:
+        import os
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(file_path)))
+        output_dir = os.path.join(base_dir, 'processed')
+        os.makedirs(output_dir, exist_ok=True)
+        output_path = os.path.join(output_dir, 'processed_train.csv')
+        df.to_csv(output_path, index=False)
+        print(f"[INFO] Processed dataset saved -> {output_path}")
+    except Exception as e:
+        print(f"[WARNING] Could not save processed CSV: {e}")
+        
     return df
 
 
