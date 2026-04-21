@@ -47,7 +47,7 @@ Thumbs.db
 .pytest_cache/
 
 # Model artifacts (large binary files — regenerate with train_model.py)
-*.pkl
+# *.pkl
 
 # Environment files
 .env

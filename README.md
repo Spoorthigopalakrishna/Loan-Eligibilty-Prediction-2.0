@@ -13,19 +13,19 @@ A professional-grade machine learning application designed to predict loan eligi
 - **Transparency**: Every prediction is accompanied by a SHAP explanation (Waterfall & Force plots).
 - **Imbalance-Aware**: Optimized for **F1-Score** using `scale_pos_weight` to better identify high-risk rejections.
 - **Robust Pipeline**: Modular source code with automated feature engineering and consistent LabelEncoding.
-- **Polished UI (Phase 4)**: A high-fidelity dashboard with real-time metrics tracking and intuitive form controls.
+- **Polished UI (Phase 5)**: A professional, centered dashboard with card-based layouts and responsive design.
 
 ## 📁 Project Structure
 
 ```
 Loan-Eligibilty-Prediction-2.0/
-├── app.py                         # Streamlit entry point
+├── app.py                         # Professional Dashboard entry point
 ├── HOW_IT_WORKS.md                # Detailed technical guide
 ├── src/
 │   ├── data_processing.py         # Feature engineering & cleaning
 │   └── train_model.py             # XGBoost training & metrics generation
 ├── data/
-│   ├── raw/                       # Immutable source data (train.csv)
+│   └── raw/                       # Immutable source data (train.csv)
 └── models/
     ├── loan_model.pkl             # Trained XGBoost artifact
     ├── explainer.pkl              # SHAP TreeExplainer
@@ -71,21 +71,26 @@ streamlit run app.py
 ## 🔎 Interpretability Features
 
 The dashboard provides three layers of explanation:
-1. **Waterfall Plot**: Deconstructs the probability score from base value to final prediction.
-2. **Result Badges**: High-visibility status indicators (Approved/Rejected) with confidence percentages.
-3. **Sidebar Analytics**: Live view of model accuracy and confusion matrix from the latest test run.
+1. **Decision Flow (Waterfall)**: Deconstructs the probability score from base value to final prediction.
+2. **Professional Status Badges**: High-visibility "ELIGIBLE" / "INELIGIBLE" indicators with confidence percentages.
+3. **Impact Table**: Detailed breakdown of each feature's positive or negative contribution to the result.
 
 ## 📝 Version History
 
-### Phase 4 — Polished UI & Monitoring (Current)
+### Phase 5 — Professional Dashboard & Deployment (Current)
+- ✅ Removed Sidebar for a cleaner, centered UX.
+- ✅ Implemented **Responsive Card Layouts** for all devices.
+- ✅ Moved technical stats to a **Model Governance Footer**.
+- ✅ Pushed to GitHub and ready for **One-Click Streamlit Cloud** deployment.
+
+### Phase 4 — Polished UI & Monitoring
 - ✅ Redesigned input form for better main-panel ergonomics.
 - ✅ Added **Result Badges** and **Confidence Progress Bars**.
-- ✅ Integrated **Live Metrics Sidebar** with Confusion Matrix visualization.
 - ✅ Automated performance artifact generation (`metrics.pkl`).
 
 ### Phase 3 — Explainability (SHAP)
 - ✅ Integrated **SHAP TreeExplainer** for granular model transparency.
-- ✅ Added interactive **Force Plots** and **Waterfall Plots** to UI.
+- ✅ Added interactive **Waterfall Plots** to UI.
 - ✅ Optimized for **Class Imbalance** (increased rejection recall by 13%).
 
 ### Phase 2 — XGBoost Model
